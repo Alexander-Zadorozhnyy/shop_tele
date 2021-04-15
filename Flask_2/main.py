@@ -1,10 +1,12 @@
-from flask import Flask, render_template, redirect, flash
+from flask import Flask, render_template, redirect, flash, make_response, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_restful import Api
 
-from Flask_2.data import db_session
+from Flask_2.data import db_session, items_api
+from Flask_2.data.api import items_recources
 from Flask_2.data.basket import Basket
 from Flask_2.data.category import Category, category_to_items
-from Flask_2.data.commands import create_item, create_basket, edit_item, delete_item
+from Flask_2.data.commands import create_item, create_basket, edit_item, delete_item, write_to_file
 from Flask_2.data.support_question import Questions
 from Flask_2.data.theme_questions import Themes
 from Flask_2.data.users import User
@@ -15,6 +17,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
 login_manager = LoginManager()
 login_manager.init_app(app)
+api = Api(app)
+
 ALL_TYPES = ['bg-dark me-md-3 pt-3 px-3 pt-md-5 px-md-5 text-center text-white overflow-hidden',
              'bg-light me-md-3 pt-3 px-3 pt-md-5 px-md-5 text-center overflow-hidden',
              'bg-light me-md-3 pt-3 px-3 pt-md-5 px-md-5 text-center overflow-hidden',
@@ -27,6 +31,11 @@ ALL_TYPES = ['bg-dark me-md-3 pt-3 px-3 pt-md-5 px-md-5 text-center text-white o
 def main():
     db_session.global_init("db/shop_info.db")
     db_sess = db_session.create_session()
+    api.add_resource(items_recources.ItemsListResource, '/api/v2/items')
+    api.add_resource(items_recources.ItemsResource, '/api/v2/items/<int:items_id>')
+    api.add_resource(items_recources.CategoryListResource, '/api/v2/categories')
+    api.add_resource(items_recources.QuestionsListResource, '/api/v2/questions')
+
     """create_item(content='AppleWatch.jpg', name='Apple Watch S5', about='Смарт-часы APPLE Watch Series 5 Nike+, 40мм, серый космос / антрацитовый/черный', characteristics='''Описание%
 С новым дисплеем, который всегда остаётся включённым, Apple Watch Series 5 — ваш самый преданный помощник. Различные циферблаты и расширения позволяют узнавать информацию, не поднимая запястье. Корпус Apple Watch 5 впервые изготовлен с применением только переработанного алюминия.%
 Процессор%
@@ -62,7 +71,6 @@ OLED, , 368 х 448 точек%
     edit_item(3, content='samsung_s10.jpeg', name='Samsung S10')
     edit_item(4, content='samsung_a40.jpeg', name='Samsung A40')
     edit_item(5, content='xiaomi_redmi_8a.jpg', name='Xiaomi Redmi 8A')'''
-
     app.run(debug=True)
 
 
@@ -70,9 +78,8 @@ OLED, , 368 х 448 точек%
 @app.route('/index')
 def index():
     db_sess = db_session.create_session()
-    item = Items
     items = [str(item).split('-') for item in db_sess.query(Items).all()]
-    print(items)
+
     return render_template("index.html", count=len(items), all_types=ALL_TYPES, items=items)  # , items=items
 
 
@@ -127,6 +134,11 @@ def register():
 def load_user(user_id):
     db_sess = db_session.create_session()
     return db_sess.query(User).get(user_id)
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({'error': 'Not found !!!'}), 404)
 
 
 @app.route('/login', methods=['GET', 'POST'])
